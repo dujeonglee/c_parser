@@ -66,24 +66,35 @@ REMOVE_KEYWORDS = ('__init', '__exit')
 
 ARGUMENT = [*(x for x in BUILD_OPTIONS if x != '')] + [*(f'-I{x}' for x in INCLUDE_PATH if x != '')]
 class Function:
+    '''Function class'''
+
     def __init__(self, name):
+        '''Initialize Function'''
+
         self.name = name
         self.caller = set()
         self.callee = set()
         self.code = ""
     def __str__(self):
+        '''Print Function Object'''
+
         return f'Function: {self.name}\n' + f'caller: {self.caller}\n' + f'callee: {self.callee}\n' + f'code: {self.code}\n'
 
 class StaticCodeAnalyizer:
     '''Static code analyzer for clang.'''
+
     def __init__(self, /, dirName = None, fileName = None):
         '''Initialize StaticCodeAnalyizer'''
+
         self.callgraph = {}
         self.dirName = None
         self.fileName = []
         self.source_lines = None
         self.file_name = None
 
+        '''
+        find all src files in given dir
+        '''
         if dirName:
             self.dirName = dirName
             if self.dirName:
@@ -92,6 +103,9 @@ class StaticCodeAnalyizer:
                 pass
         else:
             pass
+        '''
+        Append individual files to fileName list if have any
+        '''
         if fileName:
             self.fileName.append(fileName)
         print(f'%d files are loaded' % (len(self.fileName)))
@@ -99,10 +113,11 @@ class StaticCodeAnalyizer:
         print()
 
     def __print_diagnostics(self, translation_unit):
+        '''print build error messages. user must fix the errors to get correct result'''
+
         for diag in translation_unit.diagnostics:
             print(f"Severity: {diag.severity}")
             
-            # Check if diag.location.file is None
             if diag.location.file is not None:
                 print(f"Location: {diag.location.file.name}:{diag.location.line}:{diag.location.column}")
             else:
@@ -112,7 +127,8 @@ class StaticCodeAnalyizer:
             print()
 
     def __enumerate_files_in_directory(self):
-        """Traverse all files in directory"""
+        '''Traverse all files in directory'''
+
         for root, dirs, files in os.walk(self.dirName):
             for file in files:
                 file_path = os.path.join(root, file)
@@ -123,7 +139,8 @@ class StaticCodeAnalyizer:
             pass
 
     def __get_function_code_block(self, cursor):
-        """Get code block for function"""
+        '''Get code block for function'''
+
         if cursor.kind == clang.cindex.CursorKind.FUNCTION_DECL:
             start_location = cursor.extent.start
             end_location = cursor.extent.end
@@ -143,7 +160,8 @@ class StaticCodeAnalyizer:
                 return ""
 
     def __get_callees(self, node, caller_name):
-        """Get code block for function"""
+        '''Get code block for function'''
+
         if node.kind == clang.cindex.CursorKind.FUNCTION_DECL and node.spelling != caller_name:
             return
         elif node.kind == clang.cindex.CursorKind.CALL_EXPR and node.spelling not in ignore_func_list:
@@ -170,10 +188,22 @@ class StaticCodeAnalyizer:
             self.__get_callees(child, caller_name)
 
     def __get_functions(self, node):
-        """Traverse code"""
+        '''Traverse code'''
+
+        '''
+        Found function declaration.
+        '''
         if node.kind == clang.cindex.CursorKind.FUNCTION_DECL:
-            if node.spelling not in ignore_func_list:
+            '''
+            We are interested in functions which are
+            1) not in the ignore_func_list and
+            2) function is defined in given source file or source dir.
+            '''
+            if node.spelling not in ignore_func_list and node.location.file.name in [f'{x}.tmp.c' for x in self.fileName]:
                 func_name = node.spelling
+                '''
+                Get function code block
+                '''
                 code_block = self.__get_function_code_block(node)
                 if code_block:
                     if func_name not in self.callgraph:
@@ -187,10 +217,18 @@ class StaticCodeAnalyizer:
                         pass
                 else:
                     pass # end of "if code_block:"
-            self.__get_callees(node, func_name)
+                '''
+                Find callees of this function.
+                '''
+                self.__get_callees(node, func_name)
+            else:
+                pass
         else:
             pass # end of "node.kind == clang.cindex.CursorKind.FUNCTION_DECL"
 
+        '''
+        Find next function declaration.
+        '''
         for child in node.get_children():
             self.__get_functions(child)
         else:
