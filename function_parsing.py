@@ -17,22 +17,13 @@ limitations under the License.
 import os
 import clang.cindex
 
-ignore_func_list = ('likely', 'unlikely', 'WARN', 'WARN_ON', 'BUG', 'BUG_ON')
-'''
-Compile options ending with ''.
--DMODULE is required for kernel module build.
-'''
-BUILD_OPTIONS = ('-E', '-fsyntax-only', '-DMODULE')
-
-'''
-Include paths ending with ''.
-'''
-INCLUDE_PATH = (
-    '/path/to/include',
-    '')
-
-## We need to remove linux kernel specific macro and directives
-IGNORE_LINES = ('EXPORT_SYMBOL',
+config = {
+    'dirs' : ['sample'],
+    'files' : [],
+    'build_options' : ['-E', '-fsyntax-only', '-DMODULE'],
+    'include_paths' : ['sample'],
+    'ignore_func_list' : ['likely', 'unlikely', 'WARN', 'WARN_ON', 'BUG', 'BUG_ON'],
+    'ignore_lines' : ['EXPORT_SYMBOL',
                 'EXPORT_SYMBOL_GPL',
                 'module_init',
                 'module_exit',
@@ -60,11 +51,10 @@ IGNORE_LINES = ('EXPORT_SYMBOL',
                 '__initcall',
                 '__exitcall',
                 'console_initcall',
-                'security_initcall')
+                'security_initcall'],
+    'remove_keywords' : ['__init', '__exit']
+}
 
-REMOVE_KEYWORDS = ('__init', '__exit')
-
-ARGUMENT = [*(x for x in BUILD_OPTIONS if x != '')] + [*(f'-I{x}' for x in INCLUDE_PATH if x != '')]
 class Function:
     '''Function class'''
 
@@ -77,40 +67,55 @@ class Function:
         self.code = ""
     def __str__(self):
         '''Print Function Object'''
-
         return f'Function: {self.name}\n' + f'caller: {self.caller}\n' + f'callee: {self.callee}\n' + f'code: {self.code}\n'
+
+class StaticCodeAnalyizerConfig:
+    def __init__(self, /, dirs, files, build_options, include_paths, ignore_func_list, ignore_lines, remove_keywords):
+        self.dirs = dirs
+        self.files = files
+        self.build_options = build_options
+        self.include_paths = include_paths
+        self.ignore_func_list = ignore_func_list
+        self.ignore_lines = ignore_lines
+        self.remove_keywords = remove_keywords
+    def __str__(self):
+        '''Print Function Object'''
+        return f'dirs: {self.dirs}\n' + f'files: {self.files}\n' +\
+            f'build_options: {self.build_options}\n' + f'include_paths: {self.include_paths}\n' +\
+            f'ignore_func_list: {self.ignore_func_list}\n' + f'ignore_lines: {self.ignore_lines}\n' +\
+            f'remove_keywords: {self.remove_keywords}\n'
 
 class StaticCodeAnalyizer:
     '''Static code analyzer for clang.'''
 
-    def __init__(self, /, dirName = None, fileName = None):
+    def __init__(self, /, config):
         '''Initialize StaticCodeAnalyizer'''
 
-        self.callgraph = {}
-        self.dirName = None
-        self.fileName = []
-        self.source_lines = None
-        self.file_name = None
+        self.__call_graph = {}
+        self.__file_name = []
+        self.__config = config
 
         '''
         find all src files in given dir
         '''
-        if dirName:
-            self.dirName = dirName
-            if self.dirName:
-                self.fileName = [x for x in self.__enumerate_files_in_directory() if x[-1] == 'c']
-            else:
-                pass
-        else:
-            pass
+        self.__file_name = self.__get_files_in_directories(self.__config.dirs) + self.__config.files
+
         '''
         Append individual files to fileName list if have any
         '''
-        if fileName:
-            self.fileName.append(fileName)
-        print(f'%d files are loaded' % (len(self.fileName)))
-        print(*self.fileName, sep="\n")
+        print(f'%d files are loaded' % (len(self.__file_name)))
+        print(*self.__file_name, sep="\n")
         print()
+        print(self.__config)
+        print()
+
+    def __get_files_in_directories(self, input_paths):
+        '''Traverse all files in directories'''
+        input_paths.append('')
+        return [os.path.join(dirpath, filename) 
+                for path in input_paths if path != ''
+                    for dirpath, *dirnames, filenames in os.walk(path) 
+                        for filename in filenames]
 
     def __print_diagnostics(self, translation_unit):
         '''print build error messages. user must fix the errors to get correct result'''
@@ -126,17 +131,6 @@ class StaticCodeAnalyizer:
             print(f"Spelling: {diag.spelling}")
             print()
 
-    def __enumerate_files_in_directory(self):
-        '''Traverse all files in directory'''
-
-        for root, dirs, files in os.walk(self.dirName):
-            for file in files:
-                file_path = os.path.join(root, file)
-                yield file_path
-            else:
-                pass
-        else:
-            pass
 
     def __get_function_code_block(self, cursor):
         '''Get code block for function'''
@@ -164,21 +158,21 @@ class StaticCodeAnalyizer:
 
         if node.kind == clang.cindex.CursorKind.FUNCTION_DECL and node.spelling != caller_name:
             return
-        elif node.kind == clang.cindex.CursorKind.CALL_EXPR and node.spelling not in ignore_func_list:
+        elif node.kind == clang.cindex.CursorKind.CALL_EXPR and node.spelling not in self.__config.ignore_func_list:
             callee_name = node.spelling
 
-            if caller_name not in self.callgraph:
-                self.callgraph[caller_name] = Function(caller_name)
+            if caller_name not in self.__call_graph:
+                self.__call_graph[caller_name] = Function(caller_name)
             else:
-                pass # end of "if caller_name != None and caller_name not in self.callgraph"
+                pass # end of "if caller_name != None and caller_name not in self.__call_graph"
 
-            if callee_name not in self.callgraph:
-                self.callgraph[callee_name] = Function(callee_name)
+            if callee_name not in self.__call_graph:
+                self.__call_graph[callee_name] = Function(callee_name)
             else:
-                pass #end of "if callee_name != None and callee_name not in self.callgraph"
+                pass #end of "if callee_name != None and callee_name not in self.__call_graph"
 
-            caller_func = self.callgraph[caller_name]
-            callee_func = self.callgraph[callee_name]
+            caller_func = self.__call_graph[caller_name]
+            callee_func = self.__call_graph[callee_name]
             
             caller_func.callee.add(callee_name)
             callee_func.caller.add(caller_name)
@@ -199,18 +193,18 @@ class StaticCodeAnalyizer:
             1) not in the ignore_func_list and
             2) function is defined in given source file or source dir.
             '''
-            if node.spelling not in ignore_func_list and node.location.file.name in [f'{x}.tmp.c' for x in self.fileName]:
+            if node.spelling not in self.__config.ignore_func_list and node.location.file.name in [f'{x}.tmp.c' for x in self.__file_name]:
                 func_name = node.spelling
                 '''
                 Get function code block
                 '''
                 code_block = self.__get_function_code_block(node)
                 if code_block:
-                    if func_name not in self.callgraph:
-                        self.callgraph[func_name] = Function(func_name)
+                    if func_name not in self.__call_graph:
+                        self.__call_graph[func_name] = Function(func_name)
                     else:
-                        pass # end of "if func_name not in self.callgraph"
-                    func = self.callgraph[func_name]
+                        pass # end of "if func_name not in self.__call_graph"
+                    func = self.__call_graph[func_name]
                     if func_name in code_block:
                         func.code = code_block if len(code_block) > len(func.code) else func.code
                     else:
@@ -235,19 +229,18 @@ class StaticCodeAnalyizer:
             pass # end of "for child in node.get_children()"
 
     def run(self):
-        print(ARGUMENT)
-        for f in self.fileName:
+        for f in self.__file_name:
             write_file = open(f'{f}.tmp.c','w')
             with open(f) as source_file:
                 source_lines = source_file.readlines()
                 for line in source_lines:
-                    for ignore in IGNORE_LINES:
+                    for ignore in self.__config.ignore_lines:
                         if ignore in line:
                             break
                         else:
                             pass
                     else:
-                        for k in REMOVE_KEYWORDS:
+                        for k in self.__config.remove_keywords:
                             line = line.replace(k, ' ')
                         write_file.writelines(line)
                 else:
@@ -257,9 +250,11 @@ class StaticCodeAnalyizer:
         else:
             pass
 
-        for f in self.fileName:
+        for f in self.__file_name:
             index = clang.cindex.Index.create()
-            translation_unit = index.parse(f'{f}.tmp.c', args=ARGUMENT)
+            translation_unit = index.parse(f'{f}.tmp.c',
+                                           args=[x for x in self.__config.build_options + [''] if x != ''] +
+                                                [f'-I{x}' for x in self.__config.include_paths + [''] if x != ''])
 
             if not translation_unit:
                 print("Fetal Error: Failed to parse the source file {}." % (f))
@@ -274,21 +269,20 @@ class StaticCodeAnalyizer:
         else:
             pass
         
-        for f in self.fileName:
+        for f in self.__file_name:
             os.remove(f'{f}.tmp.c')
         else:
             pass
 
     def show(self):
-        for x in self.callgraph.values():
+        for x in self.__call_graph.values():
             print(x)
         else:
-            pass # end of "for x in self.callgraph"
+            pass # end of "for x in self.__call_graph"
 
 def main():
     # Replace with the path to your C/C++ source file
-    #sca = StaticCodeAnalyizer(dirName="C:/Users/sugar/Documents/function_parser/core")
-    sca = StaticCodeAnalyizer(fileName="C:/Users/sugar/Documents/function_parser/code.c")
+    sca = StaticCodeAnalyizer(StaticCodeAnalyizerConfig(**config))
     sca.run()
     sca.show()
 
