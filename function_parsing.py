@@ -28,8 +28,7 @@ BUILD_OPTIONS = ('-E', '-fsyntax-only', '-DMODULE')
 Include paths ending with ''.
 '''
 INCLUDE_PATH = (
-    'C:/Users/sugar/Documents/function_parser/core',
-    'C:/Users/sugar/Documents/function_parser/include',
+    '/path/to/include',
     '')
 
 ## We need to remove linux kernel specific macro and directives
@@ -161,10 +160,10 @@ class StaticCodeAnalyizer:
                 pass #end of "if callee_name != None and callee_name not in self.callgraph"
 
             caller_func = self.callgraph[caller_name]
-            #callee_func = self.callgraph[callee_name]
+            callee_func = self.callgraph[callee_name]
             
             caller_func.callee.add(callee_name)
-            #callee_func.caller.add(caller_name)
+            callee_func.caller.add(caller_name)
         else:
             pass
         for child in node.get_children():
