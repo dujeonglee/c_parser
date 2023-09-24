@@ -346,7 +346,7 @@ class StaticCodeAnalyizer:
 
         dot = graphviz.Digraph(comment=self.__config.project)
         for f in self.__call_graph.values():
-            dot.node(f.name, f'{f.name}{tuple([arg[0]+" "+arg[1] for arg in f.args]) if len(f.args) else "(void)"}')
+            dot.node(f.name, f'{f.name}({", ".join([arg[0]+" "+arg[1] for arg in f.args]) if len(f.args) else "void"})')
         else: pass
 
         for caller in self.__call_graph.values():
