@@ -207,7 +207,7 @@ class StaticCodeAnalyizer:
                     source_lines = source_file.readlines()
                 except Exception as e:
                     source_lines = None
-                source_file.close()
+
             if source_lines != None:
                 start_line = start_location.line - 1
                 end_line = end_location.line
@@ -267,6 +267,7 @@ class StaticCodeAnalyizer:
                     '''Get function argument'''
                     for param in node.get_arguments():
                         func.args.append((param.type.spelling, param.displayname))
+                    else: pass
 
                     '''Get callees'''
                     self.__get_callees(l, func_name)
@@ -284,22 +285,20 @@ class StaticCodeAnalyizer:
         '''For all files given by user via dirs and files'''
         for f in self.__file_name:
             '''Create tmp file for parsing'''
-            write_file = open(self.__to_tmp_file(f),'w')
-            with open(f) as source_file:
-                source_lines = source_file.readlines()
-                for line in source_lines:
-                    for ignore in self.__config.ignore_lines:
-                        if ignore in line:
-                            break
-                        else: pass
-                    else:
-                        for k in self.__config.remove_keywords:
-                            line = line.replace(k, ' ')
-                        else: pass
-                        write_file.writelines(line)
-                else: pass
-                source_file.close()
-            write_file.close()
+            with open(self.__to_tmp_file(f),'w') as write_file:
+                with open(f) as source_file:
+                    source_lines = source_file.readlines()
+                    for line in source_lines:
+                        for ignore in self.__config.ignore_lines:
+                            if ignore in line:
+                                break
+                            else: pass
+                        else:
+                            for k in self.__config.remove_keywords:
+                                line = line.replace(k, ' ')
+                            else: pass
+                            write_file.writelines(line)
+                    else: pass
 
             '''Perform parsing on tmp file'''
             print('*'*100)
