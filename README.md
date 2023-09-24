@@ -1,5 +1,6 @@
 # c_parser
-[sample output](https://github.com/dujeonglee/c_parser/blob/main/sample_project.pdf)
+![sample output](https://github.com/dujeonglee/c_parser/blob/main/sample_project.png?raw=true)
+
 
 ## Requirement
 ### libclang
