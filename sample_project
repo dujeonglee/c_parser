@@ -1,0 +1,23 @@
+// sample project
+digraph {
+	main [label="main(void)"]
+	func_d [label="func_d(void)"]
+	func_a [label="func_a(void)"]
+	printf [label="printf(void)"]
+	func_c [label="func_c(void)"]
+	func_b [label="func_b(void)"]
+	add_sub [label="add_sub(void)"]
+	add [label="add(int a, int b)"]
+	sub [label="sub(int a, int b)"]
+	main -> func_d
+	main -> func_a
+	func_d -> printf
+	func_a -> func_c
+	func_a -> printf
+	func_a -> func_b
+	func_c -> printf
+	func_b -> func_c
+	func_b -> printf
+	add_sub -> add
+	add_sub -> sub
+}
