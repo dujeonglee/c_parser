@@ -18,6 +18,9 @@ limitations under the License.
 import os
 '''Code Parsing'''
 import clang.cindex
+'''Specify libclang.so / dll path if required.'''
+## clang.cindex.Config.set_library_path('/usr/lib/x86_64-linux-gnu/')
+
 '''Rendering'''
 import graphviz
 
