@@ -24,6 +24,7 @@ import clang.cindex
 '''Rendering'''
 import graphviz
 
+'''sample config'''
 config = {
     # project name
     'project' : 'sample project',
@@ -184,16 +185,24 @@ class StaticCodeAnalyizer:
         else: pass
         return "Pass"
 
-    def __get_function_code_block(self, cursor):
+    def __tokens(self, node):
+        '''Post-order traverse'''
+        reversed_list = reversed(list(node.get_children()))
+        for child in reversed_list:
+            yield from self.__tokens(child)
+        else: pass
+        yield node
+
+    def __get_function_code_block(self, node):
         '''
         Get code block for function
         '''
 
-        if cursor.kind == clang.cindex.CursorKind.FUNCTION_DECL:
-            start_location = cursor.extent.start
-            end_location = cursor.extent.end
+        if node.kind == clang.cindex.CursorKind.FUNCTION_DECL:
+            start_location = node.extent.start
+            end_location = node.extent.end
 
-            with open(cursor.location.file.name) as source_file:
+            with open(node.location.file.name) as source_file:
                 try:
                     source_lines = source_file.readlines()
                 except Exception as e:
@@ -208,71 +217,62 @@ class StaticCodeAnalyizer:
                 return ''
         else: pass
 
-    def __get_callees(self, node, func_name):
+    def __get_callees(self, l, func_name):
         '''
         Get code block for function
         '''
+        for node in l:
+            if node.kind == clang.cindex.CursorKind.CALL_EXPR and node.spelling not in self.__config.ignore_func_list:
+                callee_name = node.spelling
 
-        '''Find all CALL_EXPR until FUNCTION_DECL is found for other function'''
-        if node.kind == clang.cindex.CursorKind.FUNCTION_DECL and node.spelling != func_name:
-            return
-        elif node.kind == clang.cindex.CursorKind.CALL_EXPR and node.spelling not in self.__config.ignore_func_list:
-            callee_name = node.spelling
+                if func_name not in self.__call_graph:
+                    self.__call_graph[func_name] = Function(func_name)
+                else: pass
 
-            if func_name not in self.__call_graph:
-                self.__call_graph[func_name] = Function(func_name)
+                if callee_name not in self.__call_graph:
+                    self.__call_graph[callee_name] = Function(callee_name)
+                else: pass
+
+                caller_func = self.__call_graph[func_name]
+                callee_func = self.__call_graph[callee_name]
+
+                caller_func.callee.add(callee_name)
+                callee_func.caller.add(func_name)
             else: pass
-
-            if callee_name not in self.__call_graph:
-                self.__call_graph[callee_name] = Function(callee_name)
-            else: pass
-
-            caller_func = self.__call_graph[func_name]
-            callee_func = self.__call_graph[callee_name]
-
-            caller_func.callee.add(callee_name)
-            callee_func.caller.add(func_name)
-        else: pass
-        for child in node.get_children():
-            self.__get_callees(child, func_name)
         else: pass
 
-    def __get_functions(self, node):
+    def __get_functions(self, root):
         '''
         Traverse functions in code
         '''
 
         '''Found function declaration'''
-        if node.kind == clang.cindex.CursorKind.FUNCTION_DECL:
-            '''
-            We are interested in functions which are
-            1) not in the ignore_func_list and
-            2) function is defined in given source file or source dir.
-            '''
-            if node.spelling not in self.__config.ignore_func_list and node.location.file.name in [self.__to_tmp_file(f) for f in self.__file_name]:
-                func_name = node.spelling
-                '''Get function code block'''
-                code_block = self.__get_function_code_block(node)
-                if code_block != '':
+        l = []
+        for node in self.__tokens(root):
+            l.append(node)
+
+            '''Found function'''
+            if node.kind == clang.cindex.CursorKind.FUNCTION_DECL:
+                if node.spelling not in self.__config.ignore_func_list and node.location.file.name in [self.__to_tmp_file(f) for f in self.__file_name]:
+                    func_name = node.spelling
+
                     if func_name not in self.__call_graph:
-                        func = Function(func_name)
-                        for param in node.get_arguments():
-                            func.args.append((param.type.spelling, param.displayname))
-                        func.code = code_block
-                        self.__call_graph[func_name] = func
+                        self.__call_graph[func_name] = Function(func_name)
                     else: pass
+                    func = self.__call_graph[func_name]
+
+                    '''Get function code block'''
+                    func.code = self.__get_function_code_block(node)
+
+                    '''Get function argument'''
+                    for param in node.get_arguments():
+                        func.args.append((param.type.spelling, param.displayname))
+
+                    '''Get callees'''
+                    self.__get_callees(l, func_name)
                 else: pass
-
-
-                '''Find callees of this function.'''
-                self.__get_callees(node, func_name)
+                l.clear()
             else: pass
-
-        else: pass
-
-        '''Find next FUNCTION_DECL'''
-        for child in node.get_children():
-            self.__get_functions(child)
         else: pass
 
     def run(self):
