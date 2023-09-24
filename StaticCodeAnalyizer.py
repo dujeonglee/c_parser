@@ -83,13 +83,14 @@ class Function:
         self.name = name
         self.caller = set()
         self.callee = set()
+        self.args = []
         self.code = ''
 
     def __str__(self):
         '''
         Print Function Object
         '''
-        return f'Function: {self.name}\n' + f'caller: {self.caller}\n' + f'callee: {self.callee}\n' + f'code: {self.code}\n'
+        return f'Function: {self.name}\n' +f'Args:{[x for x in self.args]}\n' + f'caller: {self.caller}\n' + f'callee: {self.callee}\n' + f'code: {self.code}\n'
 
 class StaticCodeAnalyizerConfig:
     '''
@@ -171,12 +172,12 @@ class StaticCodeAnalyizer:
         for diag in translation_unit.diagnostics:
             severity_level_to_string = ('Ignored', 'Note', 'Warning', 'Error', 'Fatal')
             print(f'{severity_level_to_string[diag.severity]}: {diag.spelling}')
-            
+
             if diag.location.file is not None:
                 print(f"Location: {self.__to_orig_file(diag.location.file.name)}:{diag.location.line}:{diag.location.column}")
             else:
                 print("Location: N/A")
-            
+
             if diag.severity >= clang.cindex.Diagnostic.Error:
                 return "Error:{diag.severity}"
             else: pass
@@ -228,7 +229,7 @@ class StaticCodeAnalyizer:
 
             caller_func = self.__call_graph[func_name]
             callee_func = self.__call_graph[callee_name]
-            
+
             caller_func.callee.add(callee_name)
             callee_func.caller.add(func_name)
         else: pass
@@ -255,15 +256,18 @@ class StaticCodeAnalyizer:
                 if code_block != '':
                     if func_name not in self.__call_graph:
                         func = Function(func_name)
+                        for param in node.get_arguments():
+                            func.args.append((param.type.spelling, param.displayname))
                         func.code = code_block
                         self.__call_graph[func_name] = func
                     else: pass
                 else: pass
 
+
                 '''Find callees of this function.'''
                 self.__get_callees(node, func_name)
-            else:
-                pass
+            else: pass
+
         else: pass
 
         '''Find next FUNCTION_DECL'''
@@ -324,7 +328,6 @@ class StaticCodeAnalyizer:
             print(f'Completed {self.__to_orig_file(root_cursor.spelling)}')
             print('*'*100)
         else: pass
-        
 
     def show(self):
         '''
@@ -343,7 +346,7 @@ class StaticCodeAnalyizer:
 
         dot = graphviz.Digraph(comment=self.__config.project)
         for f in self.__call_graph.values():
-            dot.node(f.name, f.name)
+            dot.node(f.name, f'{f.name}{tuple([arg[0]+" "+arg[1] for arg in f.args]) if len(f.args) else "void"}')
         else: pass
 
         for caller in self.__call_graph.values():
@@ -356,6 +359,7 @@ class StaticCodeAnalyizer:
 def main():
     sca = StaticCodeAnalyizer(StaticCodeAnalyizerConfig(**config))
     sca.run()
+    sca.show()
     sca.render()
 
 if __name__ == "__main__":
