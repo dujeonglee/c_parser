@@ -37,39 +37,7 @@ config = {
     # include path
     'include_paths' : ['sample'],
     # functions to exlcude from analysis
-    'ignore_func_list' : ['likely', 'unlikely', 'WARN', 'WARN_ON', 'BUG', 'BUG_ON'],
-    # Any line with one of strs in ignore_lines is remove from tmp file.
-    'ignore_lines' : ['EXPORT_SYMBOL',
-                'EXPORT_SYMBOL_GPL',
-                'module_init',
-                'module_exit',
-                'MODULE_LICENSE',
-                'MODULE_AUTHOR',
-                'MODULE_ALIAS_GENL_FAMILY',
-                'MODULE_DESCRIPTION',
-                'late_initcall',
-                'pure_initcall',
-                'core_initcall',
-                'core_initcall_sync',
-                'postcore_initcall',
-                'postcore_initcall_sync',
-                'arch_initcall',
-                'arch_initcall_sync',
-                'subsys_initcall',
-                'subsys_initcall_sync',
-                'fs_initcall',
-                'fs_initcall_sync',
-                'rootfs_initcall',
-                'device_initcall',
-                'device_initcall_sync',
-                'late_initcall',
-                'late_initcall_sync',
-                '__initcall',
-                '__exitcall',
-                'console_initcall',
-                'security_initcall'],
-    # keywords in remove_keywords will be removed from each line in tmp file.
-    'remove_keywords' : ['__init', '__exit']
+    'ignore_func_list' : ['likely', 'unlikely', 'WARN', 'WARN_ON', 'BUG', 'BUG_ON']
 }
 
 class Function:
@@ -97,7 +65,7 @@ class StaticCodeAnalyizerConfig:
     '''
     StaticCodeAnalyizerConfig class
     '''
-    def __init__(self, /, project, dirs, files, build_options, include_paths, ignore_func_list, ignore_lines, remove_keywords):
+    def __init__(self, /, project, dirs, files, build_options, include_paths, ignore_func_list):
         '''
         Initialize StaticCodeAnalyizerConfig
         '''
@@ -107,8 +75,6 @@ class StaticCodeAnalyizerConfig:
         self.build_options = build_options
         self.include_paths = include_paths
         self.ignore_func_list = ignore_func_list
-        self.ignore_lines = ignore_lines
-        self.remove_keywords = remove_keywords
 
     def __str__(self):
         '''
@@ -116,8 +82,7 @@ class StaticCodeAnalyizerConfig:
         '''
         return f'dirs: {self.dirs}\n' + f'files: {self.files}\n' +\
             f'build_options: {self.build_options}\n' + f'include_paths: {self.include_paths}\n' +\
-            f'ignore_func_list: {self.ignore_func_list}\n' + f'ignore_lines: {self.ignore_lines}\n' +\
-            f'remove_keywords: {self.remove_keywords}\n'
+            f'ignore_func_list: {self.ignore_func_list}\n'
 
 class StaticCodeAnalyizer:
     '''
@@ -142,19 +107,6 @@ class StaticCodeAnalyizer:
         print(self.__config)
         print()
 
-    TMP_POST_FIX = '.tmp.c'
-    def __to_tmp_file(self, f):
-        '''
-        Convert file name to tmp file name
-        '''
-        return f'{f}'+self.TMP_POST_FIX
-
-    def __to_orig_file(self, f):
-        '''
-        Revert tmp file name to original file name
-        '''
-        return f[:-(len(self.TMP_POST_FIX))]
-
     def __get_files_in_directories(self, input_paths):
         '''
         Traverse all files in directories
@@ -163,7 +115,7 @@ class StaticCodeAnalyizer:
         return set([os.path.join(dirpath, filename) 
                 for path in input_paths if path != ''
                     for dirpath, *dirnames, filenames in os.walk(path) 
-                        for filename in filenames])
+                        for filename in filenames if filename[-1] == 'c'])
 
     def __print_diagnostics(self, translation_unit):
         '''
@@ -175,7 +127,7 @@ class StaticCodeAnalyizer:
             print(f'{severity_level_to_string[diag.severity]}: {diag.spelling}')
 
             if diag.location.file is not None:
-                print(f"Location: {self.__to_orig_file(diag.location.file.name)}:{diag.location.line}:{diag.location.column}")
+                print(f"Location: {diag.location.file.name}:{diag.location.line}:{diag.location.column}")
             else:
                 print("Location: N/A")
 
@@ -253,7 +205,7 @@ class StaticCodeAnalyizer:
 
             '''Found function'''
             if node.kind == clang.cindex.CursorKind.FUNCTION_DECL:
-                if node.spelling not in self.__config.ignore_func_list and node.location.file.name in [self.__to_tmp_file(f) for f in self.__file_name]:
+                if node.spelling not in self.__config.ignore_func_list and node.location.file.name in [f for f in self.__file_name]:
                     func_name = node.spelling
 
                     if func_name not in self.__call_graph:
@@ -284,38 +236,20 @@ class StaticCodeAnalyizer:
 
         '''For all files given by user via dirs and files'''
         for f in self.__file_name:
-            '''Create tmp file for parsing'''
-            with open(self.__to_tmp_file(f),'w') as write_file:
-                with open(f) as source_file:
-                    source_lines = source_file.readlines()
-                    for line in source_lines:
-                        for ignore in self.__config.ignore_lines:
-                            if ignore in line:
-                                break
-                            else: pass
-                        else:
-                            for k in self.__config.remove_keywords:
-                                line = line.replace(k, ' ')
-                            else: pass
-                            write_file.writelines(line)
-                    else: pass
-
-            '''Perform parsing on tmp file'''
+            '''Parsing files'''
             print('*'*100)
-            translation_unit = index.parse(self.__to_tmp_file(f),
+            translation_unit = index.parse(f,
                                            args=[x for x in self.__config.build_options + [''] if x != ''] +
                                                 [f'-I{x}' for x in self.__config.include_paths + [''] if x != ''])
 
             if not translation_unit:
-                print("Fetal Error: Failed to parse the source file {}." % (f))
-                os.remove(self.__to_tmp_file(f))
+                print(f'Fetal Error: Failed to parse the source file {f}.' )
                 exit(-1)
             else: pass
 
             '''Check error'''
             if self.__print_diagnostics(translation_unit) != "Pass":
-                print("Fetal Error: Failed to parse the source file {}." % (f))
-                os.remove(self.__to_tmp_file(f))
+                print(f'Fetal Error: Failed to parse the source file {f}.' )
                 print('*'*100)
                 exit(-1)
             else: pass
@@ -323,8 +257,7 @@ class StaticCodeAnalyizer:
             '''Traverse Abstract Syntax Tree(AST)'''
             root_cursor = translation_unit.cursor
             self.__get_functions(root_cursor)
-            os.remove(self.__to_tmp_file(f))
-            print(f'Completed {self.__to_orig_file(root_cursor.spelling)}')
+            print(f'Completed {root_cursor.spelling}')
             print('*'*100)
         else: pass
 
