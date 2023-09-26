@@ -33,9 +33,7 @@ config = {
     # target files
     'files' : ['code.c'],
     # build option
-    'build_options' : ['-E', '-fsyntax-only', '-DMODULE'],
-    # include path
-    'include_paths' : ['sample'],
+    'build_options' : ['-E', '-fsyntax-only', '-DMODULE', '-Isample'],
     # functions to exlcude from analysis
     'ignore_func_list' : ['likely', 'unlikely', 'WARN', 'WARN_ON', 'BUG', 'BUG_ON']
 }
@@ -50,7 +48,6 @@ class Function:
         Initialize Function
         '''
         self.name = name
-        self.caller = set()
         self.callee = set()
         self.args = []
         self.code = ''
@@ -59,13 +56,13 @@ class Function:
         '''
         Print Function Object
         '''
-        return f'Function: {self.name}\n' +f'Args:{[x for x in self.args]}\n' + f'caller: {self.caller}\n' + f'callee: {self.callee}\n' + f'code: {self.code}\n'
+        return f'Function: {self.name}\n' +f'Args:{[x for x in self.args]}\n' + f'callee: {self.callee}\n' + f'code: {self.code}\n'
 
 class StaticCodeAnalyizerConfig:
     '''
     StaticCodeAnalyizerConfig class
     '''
-    def __init__(self, /, project, dirs, files, build_options, include_paths, ignore_func_list):
+    def __init__(self, /, project, dirs, files, build_options, ignore_func_list):
         '''
         Initialize StaticCodeAnalyizerConfig
         '''
@@ -73,16 +70,13 @@ class StaticCodeAnalyizerConfig:
         self.dirs = set(dirs)
         self.files = set(files)
         self.build_options = build_options
-        self.include_paths = include_paths
         self.ignore_func_list = ignore_func_list
 
     def __str__(self):
         '''
         Print StaticCodeAnalyizerConfig Object
         '''
-        return f'dirs: {self.dirs}\n' + f'files: {self.files}\n' +\
-            f'build_options: {self.build_options}\n' + f'include_paths: {self.include_paths}\n' +\
-            f'ignore_func_list: {self.ignore_func_list}\n'
+        return 'dirs: {0}\nfiles: {1}\nbuild_options: {2}\nignore_func_list: {3}\n'.format(self.dirs, self.files, self.build_options, self.ignore_func_list)
 
 class StaticCodeAnalyizer:
     '''
@@ -181,15 +175,9 @@ class StaticCodeAnalyizer:
                     self.__call_graph[func_name] = Function(func_name)
                 else: pass
 
-                if callee_name not in self.__call_graph:
-                    self.__call_graph[callee_name] = Function(callee_name)
-                else: pass
-
                 caller_func = self.__call_graph[func_name]
-                callee_func = self.__call_graph[callee_name]
 
                 caller_func.callee.add(callee_name)
-                callee_func.caller.add(func_name)
             else: pass
         else: pass
 
@@ -238,9 +226,7 @@ class StaticCodeAnalyizer:
         for f in self.__file_name:
             '''Parsing files'''
             print('*'*100)
-            translation_unit = index.parse(f,
-                                           args=[x for x in self.__config.build_options + [''] if x != ''] +
-                                                [f'-I{x}' for x in self.__config.include_paths + [''] if x != ''])
+            translation_unit = index.parse(f, args=[x for x in self.__config.build_options + [''] if x != ''])
 
             if not translation_unit:
                 print(f'Fetal Error: Failed to parse the source file {f}.' )
