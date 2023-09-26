@@ -24,21 +24,8 @@ config = {
     # target files
     'files' : ['code.c'],
     # build option
-    'build_options' : ['-E', '-fsyntax-only', '-DMODULE'],
-    # include path
-    'include_paths' : ['sample'],
+    'build_options' : ['-E', '-fsyntax-only', '-DMODULE', '-Isample'],
     # functions to exlcude from analysis
-    'ignore_func_list' : ['likely', 'unlikely', 'WARN', 'WARN_ON', 'BUG', 'BUG_ON'],
-    # Any line with one of strs in ignore_lines is remove from tmp file.
-    'ignore_lines' : ['EXPORT_SYMBOL',
-                'EXPORT_SYMBOL_GPL',
-                'module_init',
-                'module_exit',
-                'MODULE_LICENSE',
-                'MODULE_AUTHOR',
-                'MODULE_ALIAS_GENL_FAMILY',
-                'MODULE_DESCRIPTION'],
-    # keywords in remove_keywords will be removed from each line in tmp file.
-    'remove_keywords' : ['__init', '__exit']
+    'ignore_func_list' : ['likely', 'unlikely', 'WARN', 'WARN_ON', 'BUG', 'BUG_ON']
 }
 ```
