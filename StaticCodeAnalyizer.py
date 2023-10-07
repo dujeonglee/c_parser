@@ -24,20 +24,6 @@ import clang.cindex
 '''Rendering'''
 import graphviz
 
-'''sample config'''
-config = {
-    # project name
-    'project' : 'sample project',
-    # target dir
-    'dirs' : ['sample'],
-    # target files
-    'files' : ['code.c'],
-    # build option
-    'build_options' : ['-E', '-fsyntax-only', '-DMODULE', '-Isample'],
-    # functions to exlcude from analysis
-    'ignore_func_list' : ['likely', 'unlikely', 'WARN', 'WARN_ON', 'BUG', 'BUG_ON']
-}
-
 class Function:
     '''
     Function class
@@ -71,6 +57,20 @@ class StaticCodeAnalyizerConfig:
         self.files = set(files)
         self.build_options = build_options
         self.ignore_func_list = ignore_func_list
+
+    def __init__(self, /, filename = 'config'):
+        with open(filename) as source_file:
+                try:
+                    config = source_file.read()
+                except Exception as e:
+                    config = ''
+        config = eval(config)
+        self.project = config['project']
+        self.dirs = set(config['dirs'])
+        self.files = set(config['files'])
+        self.build_options = config['build_options']
+        self.ignore_func_list = config['ignore_func_list']
+        print(config)
 
     def __str__(self):
         '''
@@ -168,16 +168,12 @@ class StaticCodeAnalyizer:
         Get code block for function
         '''
         for node in l:
-            if node.kind == clang.cindex.CursorKind.CALL_EXPR and node.spelling not in self.__config.ignore_func_list:
-                callee_name = node.spelling
-
-                if func_name not in self.__call_graph:
-                    self.__call_graph[func_name] = Function(func_name)
+            if node.kind == clang.cindex.CursorKind.CALL_EXPR:
+                if node.spelling not in self.__config.ignore_func_list:
+                    callee_name = node.spelling
+                    caller_func = self.__call_graph[func_name]
+                    caller_func.callee.add(callee_name)
                 else: pass
-
-                caller_func = self.__call_graph[func_name]
-
-                caller_func.callee.add(callee_name)
             else: pass
         else: pass
 
@@ -196,6 +192,7 @@ class StaticCodeAnalyizer:
                 if node.spelling not in self.__config.ignore_func_list and node.location.file.name in [f for f in self.__file_name]:
                     func_name = node.spelling
 
+                    '''Add Function to __call_graph if func_name does not exist'''
                     if func_name not in self.__call_graph:
                         self.__call_graph[func_name] = Function(func_name)
                     else: pass
@@ -275,7 +272,7 @@ class StaticCodeAnalyizer:
         dot.render(self.__config.project.replace(' ', '_'), view=True)
 
 def main():
-    sca = StaticCodeAnalyizer(StaticCodeAnalyizerConfig(**config))
+    sca = StaticCodeAnalyizer(StaticCodeAnalyizerConfig(filename='config'))
     sca.run()
     sca.show()
     sca.render()
