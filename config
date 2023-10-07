@@ -1,0 +1,12 @@
+{
+    # project name
+    'project' : 'sample project',
+    # target dir
+    'dirs' : ['sample'],
+    # target files
+    'files' : ['code.c'],
+    # build option
+    'build_options' :   ['-E'],
+    # functions to exlcude from analysis
+    'ignore_func_list' : []
+}
