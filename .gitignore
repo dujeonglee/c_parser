@@ -1,6 +1,8 @@
-*.gv
-*.html
-*.log
-*.png
-*.pdf
-sample_project*
+*
+!/README.md
+!/LICENSE
+!/sample
+!/code.c
+!/StaticCodeAnalyzer.py
+!config
+!.gitignore
